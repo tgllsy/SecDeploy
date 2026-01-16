@@ -1,0 +1,15 @@
+- name: 安装开发环境（Debian 系）
+  ansible.builtin.apt:
+    name: "{{ dev_packages_debian }}"
+    state: present
+    update_cache: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: 确保 pipx PATH 生效（系统级）
+  ansible.builtin.command: pipx ensurepath --global
+  register: pipx_ensurepath
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not ansible_check_mode

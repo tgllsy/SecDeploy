@@ -1,0 +1,36 @@
+- name: 应用基本 sysctl 参数
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: true
+    reload: true
+  loop: "{{ sysctl_tune | dict2items | rejectattr('key', 'equalto', 'net.core.default_qdisc') | rejectattr('key', 'equalto', 'net.ipv4.tcp_congestion_control') | list }}"
+  when: enable_system_tune | bool
+
+- name: 检查内核版本是否支持 BBR
+  ansible.builtin.shell: "uname -r | awk -F'[-.]' '{print $1 * 10000 + $2 * 100 + $3}'"
+  register: kernel_version
+  changed_when: false
+  check_mode: false
+  when:
+    - enable_system_tune | bool
+    - enable_bbr | bool
+
+- name: 启用 BBR 拥塞控制算法
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: true
+    reload: true
+  loop:
+    - name: net.core.default_qdisc
+      value: fq
+    - name: net.ipv4.tcp_congestion_control
+      value: bbr
+  when:
+    - enable_system_tune | bool
+    - enable_bbr | bool
+    - kernel_version.stdout is defined
+    - kernel_version.stdout | int >= 40900  # 内核版本 4.9.0 或更高

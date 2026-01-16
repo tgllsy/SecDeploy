@@ -1,0 +1,5 @@
+docker_users: []
+docker_registry_mirrors: []
+docker_daemon_options: {}
+docker_gpg_url: "https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}/gpg"
+docker_repo_base_url: "https://download.docker.com/linux/{{ ansible_facts.distribution | lower }}"

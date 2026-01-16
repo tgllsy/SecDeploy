@@ -1,0 +1,111 @@
+- name: 校验系统家族
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family in ["Debian", "RedHat"]
+    fail_msg: "仅支持 Debian/Ubuntu/Kali 或 RHEL/CentOS 系列（可按需扩展）"
+
+- name: 更新 apt 缓存
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts.os_family == "Debian"
+
+- name: 安装基础包
+  ansible.builtin.package:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: 校验时区文件存在
+  ansible.builtin.stat:
+    path: "/usr/share/zoneinfo/{{ timezone_name }}"
+  register: tz_stat
+  when: timezone_name is defined and timezone_name | length > 0
+
+- name: 写入 /etc/timezone（Debian 系）
+  ansible.builtin.copy:
+    dest: /etc/timezone
+    mode: "0644"
+    content: "{{ timezone_name }}\n"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - timezone_name is defined and timezone_name | length > 0
+    - tz_stat.stat.exists
+
+- name: 链接 /etc/localtime
+  ansible.builtin.file:
+    src: "/usr/share/zoneinfo/{{ timezone_name }}"
+    dest: /etc/localtime
+    state: link
+    force: true
+  when:
+    - timezone_name is defined and timezone_name | length > 0
+    - tz_stat.stat.exists
+
+- name: 安装 chrony
+  ansible.builtin.package:
+    name: chrony
+    state: present
+
+- name: 启用 chrony
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+
+- name: 配置 pip 国内源
+  ansible.builtin.copy:
+    dest: /etc/pip.conf
+    mode: "0644"
+    content: |
+      [global]
+      index-url = {{ pip_index_url }}
+      timeout = 30
+  when: pip_index_url is defined and pip_index_url | length > 0
+
+# UFW 防火墙配置
+- name: 安装 UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: false
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ufw_enabled | bool
+
+- name: 设置 UFW 默认策略
+  community.general.ufw:
+    default: "{{ ufw_default_policy }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ufw_enabled | bool
+    - not ansible_check_mode
+
+- name: 开放指定端口
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ ufw_allow_ports }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ufw_enabled | bool
+    - not ansible_check_mode
+
+- name: 启用 UFW
+  community.general.ufw:
+    state: enabled
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ufw_enabled | bool
+    - not ansible_check_mode
+
+- name: 重启 UFW 服务
+  ansible.builtin.service:
+    name: ufw
+    state: restarted
+    enabled: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ufw_enabled | bool
+    - not ansible_check_mode

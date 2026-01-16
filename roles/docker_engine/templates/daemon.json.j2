@@ -1,0 +1,3 @@
+{%- set merged = {'registry-mirrors': docker_registry_mirrors} -%}
+{%- set merged = merged | combine(docker_daemon_options, recursive=True) -%}
+{{ merged | to_nice_json }}

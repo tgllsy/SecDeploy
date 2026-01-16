@@ -1,0 +1,54 @@
+- name: 校验平台
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == "Debian"
+    fail_msg: "当前 docker_engine 仅实现 Debian/Ubuntu/Kali，其他发行版可按需扩展"
+
+- name: 安装 Docker 依赖
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: false
+
+- name: 使用 get.docker.com 脚本安装 Docker
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://get.docker.com | sh
+  when:
+    - not ansible_check_mode
+
+- name: 创建 /etc/docker
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    mode: "0755"
+
+- name: 生成 daemon.json
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  notify: 重启 docker
+  when: not ansible_check_mode
+
+- name: 启用并启动 Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  when: not ansible_check_mode
+
+- name: 创建 docker 组
+  ansible.builtin.group:
+    name: docker
+    state: present
+
+- name: 将用户加入 docker 组
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"
+  when: docker_users | length > 0

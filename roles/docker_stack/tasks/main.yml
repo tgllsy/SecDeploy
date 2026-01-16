@@ -1,0 +1,32 @@
+- name: 创建部署目录
+  ansible.builtin.file:
+    path: "{{ docker_stack_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: 写入 docker compose 配置
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ docker_stack_dir }}/compose.yml"
+    mode: "0644"
+
+- name: 检测 docker compose 子命令
+  ansible.builtin.command: docker compose version
+  register: docker_compose_subcmd
+  changed_when: false
+  failed_when: false
+
+- name: 设置 compose 启动命令
+  ansible.builtin.set_fact:
+    compose_up_cmd: >-
+      {{ 'docker compose' if docker_compose_subcmd.rc == 0 else 'docker-compose' }}
+
+- name: 启动容器栈
+  ansible.builtin.shell: "{{ compose_up_cmd }} -f {{ docker_stack_dir }}/compose.yml up -d"
+  args:
+    executable: /bin/bash
+  register: compose_up
+  changed_when: true
+  when:
+    - docker_stack_enable | bool
+    - not ansible_check_mode

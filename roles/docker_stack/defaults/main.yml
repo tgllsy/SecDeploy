@@ -1,0 +1,5 @@
+docker_stack_dir: /opt/pentest-stack
+docker_stack_enable: true
+arl_docker_image: honmashironeko/arl-docker-portion
+arl_container_name: arl
+arl_web_port: "5003:5003"

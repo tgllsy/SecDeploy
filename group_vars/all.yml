@@ -1,0 +1,146 @@
+timezone_name: Asia/Shanghai
+
+enable_system_tune: true
+sysctl_tune:
+  fs.file-max: 2097152
+  net.core.somaxconn: 4096
+  net.core.netdev_max_backlog: 16384
+  net.ipv4.tcp_fin_timeout: 15
+  net.ipv4.tcp_keepalive_time: 600
+  net.ipv4.ip_local_port_range: "10240 65535"
+  net.ipv4.tcp_max_syn_backlog: 8192
+  net.ipv4.tcp_tw_reuse: 1
+  net.core.default_qdisc: fq
+  net.ipv4.tcp_congestion_control: bbr
+
+enable_bbr: true
+
+base_packages:
+  - ca-certificates
+  - curl
+  - wget
+  - gnupg
+  - lsb-release
+  - git
+  - vim
+  - tmux
+  - unzip
+  - zip
+  - tar
+  - jq
+  - net-tools
+  - iproute2
+  - dnsutils
+  - tcpdump
+  - htop
+  - tree
+  - bash-completion
+  - ufw
+
+
+dev_packages_debian:
+  - build-essential
+  - pkg-config
+  - python3
+  - python3-pip
+  - python3-venv
+  - python3-dev
+  - pipx
+  - golang
+  - openjdk-11-jdk
+  - openjdk-11-jre-headless
+  - nodejs
+  - npm
+
+pip_index_url: https://pypi.tuna.tsinghua.edu.cn/simple
+
+pentest_packages_debian:
+  - nmap
+  - masscan
+  - nikto
+  - sqlmap
+  - hydra
+  - john
+  - hashcat
+  - gobuster
+  - dirb
+  - whatweb
+  - wireshark-common
+  - tshark
+  - netcat-traditional
+  - socat
+  - seclists
+
+
+pentest_install_kali_meta: true
+kali_meta_packages:
+  - kali-tools-top10
+
+# 从GitHub releases获取的工具配置
+github_tools:
+  - name: nuclei
+    repo: projectdiscovery/nuclei
+    binary_name: nuclei
+    install_dir: /usr/local/bin
+    asset_pattern: "nuclei.*linux.*amd64.*(zip|tar.gz)"
+    enabled: true
+
+  - name: naabu
+    repo: projectdiscovery/naabu
+    binary_name: naabu
+    install_dir: /usr/local/bin
+    asset_pattern: "naabu.*linux.*amd64.*(zip|tar.gz)"
+    enabled: true
+
+  - name: subfinder
+    repo: projectdiscovery/subfinder
+    binary_name: subfinder
+    install_dir: /usr/local/bin
+    asset_pattern: "subfinder.*linux.*amd64.*(zip|tar.gz)"
+    enabled: true
+
+  - name: observer_ward
+    repo: emo-crab/observer_ward
+    binary_name: observer_ward
+    install_dir: /usr/local/bin
+    asset_pattern: "observer_ward.*linux.*amd64.*(zip|tar.gz)"
+    enabled: true
+
+  - name: afrog
+    repo: zan8in/afrog
+    binary_name: afrog
+    install_dir: /usr/local/bin
+    asset_pattern: "afrog.*linux.*amd64.*(zip|tar.gz)"
+    enabled: true
+
+  - name: httpx
+    repo: projectdiscovery/httpx
+    binary_name: httpx
+    install_dir: /usr/local/bin
+    asset_pattern: "httpx.*linux.*amd64.*(zip|tar.gz)"
+    enabled: true
+
+docker_users: []
+
+docker_registry_mirrors: []
+docker_daemon_options:
+  "iptables": false
+  "ip-masq": false
+  "userland-proxy": false
+
+# UFW 配置
+ufw_enabled: true
+ufw_default_policy: "deny"
+ufw_allow_ports:
+  - "22"
+  - "80"
+  - "443"
+  - "8080"
+  - "8888"
+  - "9000:9100"
+  - "12345"
+
+docker_stack_dir: /opt/pentest-stack
+arl_docker_image: honmashironeko/arl-docker-portion
+arl_container_name: arl
+arl_web_port: "5003:5003"
