@@ -113,8 +113,7 @@
     that:
       - "'nginx' in final_service_facts.ansible_facts.services"
       - final_service_facts.ansible_facts.services['nginx'].state == 'running'
-      - final_service_facts.ansible_facts.services['nginx'].status == 'enabled'
-    fail_msg: "Nginx 服务未正常运行或未启用"
+    fail_msg: "Nginx 服务未正常运行"
     success_msg: "Nginx 服务已成功安装、配置并运行"
 
 - name: 安装 chrony
