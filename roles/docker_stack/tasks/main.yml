@@ -1,32 +1,26 @@
-- name: 创建部署目录
+- name: 克隆 ARL-docker 项目
+  ansible.builtin.git:
+    repo: https://github.com/honmashironeko/ARL-docker
+    dest: /opt/ARL-docker
+    update: false  # 只在目录不存在时克隆，已存在时不更新
+  register: git_clone
+  when:
+    - arl_enable | bool
+
+- name: 设置 setup_docker.sh 脚本执行权限
   ansible.builtin.file:
-    path: "{{ docker_stack_dir }}"
-    state: directory
-    mode: "0755"
+    path: /opt/ARL-docker/setup_docker.sh
+    mode: '0755'
+  when:
+    - arl_enable | bool
 
-- name: 写入 docker compose 配置
-  ansible.builtin.template:
-    src: compose.yml.j2
-    dest: "{{ docker_stack_dir }}/compose.yml"
-    mode: "0644"
-
-- name: 检测 docker compose 子命令
-  ansible.builtin.command: docker compose version
-  register: docker_compose_subcmd
-  changed_when: false
-  failed_when: false
-
-- name: 设置 compose 启动命令
-  ansible.builtin.set_fact:
-    compose_up_cmd: >-
-      {{ 'docker compose' if docker_compose_subcmd.rc == 0 else 'docker-compose' }}
-
-- name: 启动容器栈
-  ansible.builtin.shell: "{{ compose_up_cmd }} -f {{ docker_stack_dir }}/compose.yml up -d"
+- name: 执行 ARL 安装脚本
+  ansible.builtin.shell: bash setup_docker.sh
   args:
+    chdir: /opt/ARL-docker
     executable: /bin/bash
-  register: compose_up
+  register: arl_install
   changed_when: true
   when:
-    - docker_stack_enable | bool
+    - arl_enable | bool
     - not ansible_check_mode

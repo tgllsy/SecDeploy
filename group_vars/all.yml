@@ -148,10 +148,8 @@ ufw_allow_ports:
   - "9000:9100"
   - "12345"
 
-docker_stack_dir: /opt/pentest-stack
-arl_docker_image: honmashironeko/arl-docker-portion
-arl_container_name: arl
-arl_web_port: "5003:5003"
+arl_enable: true  # 控制是否启用 ARL 安装
+# ARL 配置已通过 setup_docker.sh 脚本管理
 
 # Nginx 代理配置
 nginx_proxy_user: admin  # 自定义代理认证头中的用户名称

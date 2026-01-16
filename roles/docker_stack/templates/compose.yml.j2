@@ -1,9 +1,0 @@
-services:
-  arl:
-    image: "{{ arl_docker_image }}"
-    container_name: "{{ arl_container_name }}"
-    privileged: true
-    restart: unless-stopped
-    ports:
-      - "{{ arl_web_port }}"
-    command: /usr/sbin/init
