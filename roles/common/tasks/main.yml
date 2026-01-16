@@ -15,31 +15,10 @@
     name: "{{ base_packages }}"
     state: present
 
-- name: 校验时区文件存在
-  ansible.builtin.stat:
-    path: "/usr/share/zoneinfo/{{ timezone_name }}"
-  register: tz_stat
+- name: 设置系统时区
+  community.general.timezone:
+    name: "{{ timezone_name }}"
   when: timezone_name is defined and timezone_name | length > 0
-
-- name: 写入 /etc/timezone（Debian 系）
-  ansible.builtin.copy:
-    dest: /etc/timezone
-    mode: "0644"
-    content: "{{ timezone_name }}\n"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - timezone_name is defined and timezone_name | length > 0
-    - tz_stat.stat.exists
-
-- name: 链接 /etc/localtime
-  ansible.builtin.file:
-    src: "/usr/share/zoneinfo/{{ timezone_name }}"
-    dest: /etc/localtime
-    state: link
-    force: true
-  when:
-    - timezone_name is defined and timezone_name | length > 0
-    - tz_stat.stat.exists
 
 - name: 安装 chrony
   ansible.builtin.package:

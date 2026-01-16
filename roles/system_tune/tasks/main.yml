@@ -1,3 +1,65 @@
+- name: 检查系统是否已存在交换空间
+  ansible.builtin.shell: "swapon --show | wc -l"
+  register: swap_exists
+  changed_when: false
+  check_mode: false
+  when: enable_swap | bool
+
+- name: 获取系统内存大小(MB)
+  ansible.builtin.shell: "free -m | grep Mem | awk '{print $2}'"
+  register: system_memory_mb
+  changed_when: false
+  check_mode: false
+  when: 
+    - enable_swap | bool
+    - swap_exists.stdout | int == 0
+
+- name: 计算交换空间大小(GB)
+  ansible.builtin.set_fact:
+    calculated_swap_gb: "{{ [swap_size_min, (system_memory_mb.stdout | int * swap_size_percentage / 100 / 1024) | round(0, 'common') | int, swap_size_max] | sort | [1] }}"
+  when: 
+    - enable_swap | bool
+    - swap_exists.stdout | int == 0
+
+- name: 创建交换文件
+  ansible.builtin.shell: "fallocate -l {{ calculated_swap_gb }}G /swapfile || dd if=/dev/zero of=/swapfile bs=1G count={{ calculated_swap_gb }}"
+  when: 
+    - enable_swap | bool
+    - swap_exists.stdout | int == 0
+
+- name: 设置交换文件权限
+  ansible.builtin.file:
+    path: /swapfile
+    mode: '0600'
+  when: 
+    - enable_swap | bool
+    - swap_exists.stdout | int == 0
+
+- name: 格式化交换文件
+  ansible.builtin.command: mkswap /swapfile
+  when: 
+    - enable_swap | bool
+    - swap_exists.stdout | int == 0
+
+- name: 启用交换空间
+  ansible.builtin.command: swapon /swapfile
+  when: 
+    - enable_swap | bool
+    - swap_exists.stdout | int == 0
+
+- name: 添加交换空间到 fstab
+  ansible.posix.mount:
+    name: none
+    src: /swapfile
+    fstype: swap
+    opts: sw
+    passno: 0
+    dump: 0
+    state: present
+  when: 
+    - enable_swap | bool
+    - swap_exists.stdout | int == 0
+
 - name: 应用基本 sysctl 参数
   ansible.posix.sysctl:
     name: "{{ item.key }}"

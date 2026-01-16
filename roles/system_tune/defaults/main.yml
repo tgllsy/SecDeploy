@@ -1,2 +1,6 @@
 enable_system_tune: false
+enable_swap: false
+swap_size_percentage: 100  # 内存小于8GB时的交换空间百分比
+swap_size_min: 1  # 最小交换空间(GB)
+swap_size_max: 16  # 最大交换空间(GB)
 sysctl_tune: {}

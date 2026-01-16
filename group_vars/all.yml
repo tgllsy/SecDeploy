@@ -1,6 +1,10 @@
 timezone_name: Asia/Shanghai
 
 enable_system_tune: true
+enable_swap: true  # 启用交换空间设置
+swap_size_percentage: 100  # 内存小于8GB时，交换空间为内存的100%
+swap_size_min: 1  # 最小交换空间1GB
+swap_size_max: 16  # 最大交换空间16GB
 sysctl_tune:
   fs.file-max: 2097152
   net.core.somaxconn: 4096
@@ -12,6 +16,8 @@ sysctl_tune:
   net.ipv4.tcp_tw_reuse: 1
   net.core.default_qdisc: fq
   net.ipv4.tcp_congestion_control: bbr
+  vm.swappiness: 60  # 系统交换倾向，0-100，数值越大越倾向于使用交换空间
+  vm.vfs_cache_pressure: 100  # 缓存回收压力
 
 enable_bbr: true
 
@@ -36,6 +42,7 @@ base_packages:
   - tree
   - bash-completion
   - ufw
+  - tzdata
 
 
 dev_packages_debian:
