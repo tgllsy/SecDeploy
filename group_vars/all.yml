@@ -133,8 +133,7 @@ docker_users: []
 docker_registry_mirrors: []
 docker_daemon_options:
   "iptables": false
-  "ip-masq": false
-  "userland-proxy": false
+
 
 # UFW 配置
 ufw_enabled: true
