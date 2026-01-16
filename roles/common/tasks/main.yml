@@ -15,10 +15,107 @@
     name: "{{ base_packages }}"
     state: present
 
+- name: 检查 Nginx 服务状态（安装后）
+  ansible.builtin.service_facts:
+  register: service_facts
+
+- name: 启动 Nginx 服务（如果未启动）
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+  when: "'nginx' in service_facts.ansible_facts.services and service_facts.ansible_facts.services['nginx'].state != 'running'"
+  register: nginx_start
+  until: nginx_start is succeeded
+  retries: 3
+  delay: 5
+
+- name: 安装 htpasswd 工具（Debian 系）
+  ansible.builtin.apt:
+    name: apache2-utils
+    state: present
+  when: ansible_facts.os_family == "Debian"
+
+- name: 安装 htpasswd 工具（RHEL 系）
+  ansible.builtin.yum:
+    name: httpd-tools
+    state: present
+  when: ansible_facts.os_family == "RedHat"
+
 - name: 设置系统时区
   community.general.timezone:
     name: "{{ timezone_name }}"
   when: timezone_name is defined and timezone_name | length > 0
+
+- name: 创建 htpasswd 文件
+  ansible.builtin.shell: "htpasswd -b -c {{ nginx_htpasswd_file | default('/etc/nginx/.htpasswd') }} {{ nginx_proxy_user | default('admin') }} {{ nginx_proxy_password | default('admin123') }}"
+  args:
+    creates: "{{ nginx_htpasswd_file | default('/etc/nginx/.htpasswd') }}"
+  no_log: true
+
+- name: 设置 htpasswd 文件权限
+  ansible.builtin.file:
+    path: "{{ nginx_htpasswd_file | default('/etc/nginx/.htpasswd') }}"
+    mode: '0640'
+    owner: root
+    group: www-data
+  when: ansible_facts.os_family == "Debian"
+
+- name: 设置 htpasswd 文件权限（RHEL 系）
+  ansible.builtin.file:
+    path: "{{ nginx_htpasswd_file | default('/etc/nginx/.htpasswd') }}"
+    mode: '0640'
+    owner: root
+    group: nginx
+  when: ansible_facts.os_family == "RedHat"
+
+- name: 复制 Nginx 反向代理配置
+  ansible.builtin.template:
+    src: nginx-proxy.conf.j2
+    dest: /etc/nginx/sites-available/proxy.conf
+    mode: "0644"
+
+- name: 创建 Nginx 配置软链接
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/proxy.conf
+    dest: /etc/nginx/sites-enabled/proxy.conf
+    state: link
+    force: true
+
+- name: 删除 Nginx 默认配置
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: 检查 Nginx 配置语法
+  ansible.builtin.command: nginx -t
+  register: nginx_syntax_check
+  changed_when: false
+  check_mode: false
+
+- name: 重启 Nginx 服务
+  ansible.builtin.service:
+    name: nginx
+    state: restarted
+    enabled: true
+  when: nginx_syntax_check.rc == 0
+  register: nginx_restart
+  until: nginx_restart is succeeded
+  retries: 3
+  delay: 5
+
+- name: 再次检查 Nginx 服务状态（配置后）
+  ansible.builtin.service_facts:
+  register: final_service_facts
+
+- name: 验证 Nginx 服务正在运行
+  ansible.builtin.assert:
+    that:
+      - "'nginx' in final_service_facts.ansible_facts.services"
+      - final_service_facts.ansible_facts.services['nginx'].state == 'running'
+      - final_service_facts.ansible_facts.services['nginx'].status == 'enabled'
+    fail_msg: "Nginx 服务未正常运行或未启用"
+    success_msg: "Nginx 服务已成功安装、配置并运行"
 
 - name: 安装 chrony
   ansible.builtin.package:

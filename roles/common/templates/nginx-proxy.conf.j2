@@ -1,0 +1,33 @@
+server {
+    listen 9001;
+    server_name _;
+
+    # 访问日志配置
+    access_log /var/log/nginx/proxy.access.log;
+    error_log /var/log/nginx/proxy.error.log;
+
+
+    # htpasswd 认证配置
+    auth_basic "Restricted Access";
+    auth_basic_user_file {{ nginx_htpasswd_file | default('/etc/nginx/.htpasswd') }};
+
+    # 反向代理配置
+    location / {
+        proxy_pass http://127.0.0.1:5003;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 代理超时设置
+        proxy_connect_timeout 60;
+        proxy_send_timeout 60;
+        proxy_read_timeout 60;
+        
+        # 缓冲区设置
+        proxy_buffers 8 16k;
+        proxy_buffer_size 32k;
+    }
+
+
+}

@@ -43,6 +43,7 @@ base_packages:
   - bash-completion
   - ufw
   - tzdata
+  - nginx
 
 
 dev_packages_debian:
@@ -151,3 +152,8 @@ docker_stack_dir: /opt/pentest-stack
 arl_docker_image: honmashironeko/arl-docker-portion
 arl_container_name: arl
 arl_web_port: "5003:5003"
+
+# Nginx 代理配置
+nginx_proxy_user: admin  # 自定义代理认证头中的用户名称
+nginx_proxy_password: admin123  # htpasswd 认证密码
+nginx_htpasswd_file: /etc/nginx/.htpasswd  # htpasswd 文件路径
