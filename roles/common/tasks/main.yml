@@ -30,18 +30,6 @@
   retries: 3
   delay: 5
 
-- name: 安装 htpasswd 工具（Debian 系）
-  ansible.builtin.apt:
-    name: apache2-utils
-    state: present
-  when: ansible_facts.os_family == "Debian"
-
-- name: 安装 htpasswd 工具（RHEL 系）
-  ansible.builtin.yum:
-    name: httpd-tools
-    state: present
-  when: ansible_facts.os_family == "RedHat"
-
 - name: 设置系统时区
   community.general.timezone:
     name: "{{ timezone_name }}"
@@ -61,13 +49,6 @@
     group: www-data
   when: ansible_facts.os_family == "Debian"
 
-- name: 设置 htpasswd 文件权限（RHEL 系）
-  ansible.builtin.file:
-    path: "{{ nginx_htpasswd_file | default('/etc/nginx/.htpasswd') }}"
-    mode: '0640'
-    owner: root
-    group: nginx
-  when: ansible_facts.os_family == "RedHat"
 
 - name: 复制 Nginx 反向代理配置
   ansible.builtin.template:
@@ -184,3 +165,5 @@
     - ansible_facts.os_family == "Debian"
     - ufw_enabled | bool
     - not ansible_check_mode
+
+

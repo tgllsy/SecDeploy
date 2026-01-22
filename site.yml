@@ -7,12 +7,14 @@
     - role: common
       tags: [common]
     - role: system_tune
-      tags: [tune]
+      tags: [system_tune, tune]
     - role: dev_env
-      tags: [dev]
+      tags: [dev_env, dev]
     - role: pentest_tools
-      tags: [pentest]
+      tags: [pentest_tools, pentest]
     - role: docker_engine
-      tags: [docker]
+      tags: [docker_engine, docker]
     - role: docker_stack
-      tags: [stack]
+      tags: [docker_stack, stack]
+    - role: download
+      tags: [download]

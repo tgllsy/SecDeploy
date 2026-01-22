@@ -33,6 +33,7 @@ base_packages:
   - unzip
   - zip
   - tar
+  - p7zip-full
   - jq
   - net-tools
   - iproute2
@@ -44,6 +45,7 @@ base_packages:
   - ufw
   - tzdata
   - nginx
+  - apache2-utils
 
 
 dev_packages_debian:
@@ -154,3 +156,7 @@ arl_enable: true  # 控制是否启用 ARL 安装
 nginx_proxy_user: admin  # 自定义代理认证头中的用户名称
 nginx_proxy_password: admin123  # htpasswd 认证密码
 nginx_htpasswd_file: /etc/nginx/.htpasswd  # htpasswd 文件路径
+
+# 下载链接配置示例（可添加多个链接）
+download_links:
+  - "https://s3.xxxx.dpdns.org/CS491.7z"

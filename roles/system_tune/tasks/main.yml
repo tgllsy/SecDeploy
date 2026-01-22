@@ -1,53 +1,114 @@
-- name: 检查系统是否已存在交换空间
-  ansible.builtin.shell: "swapon --show | wc -l"
-  register: swap_exists
+---
+# 1. 获取系统基本信息
+- name: 获取系统内存大小 (MB)
+  ansible.builtin.shell: "free -m | grep Mem | awk '{print $2}'"
+  register: system_memory_mb_out
   changed_when: false
   check_mode: false
+
+- name: 设置内存变量
+  ansible.builtin.set_fact:
+    sys_mem_mb: "{{ system_memory_mb_out.stdout | int }}"
+
+# 2. 获取当前 Swapfile 状态
+- name: 检查 /swapfile 文件是否存在
+  ansible.builtin.stat:
+    path: /swapfile
+  register: swapfile_stat
+
+- name: 检查 Swap 是否已激活
+  ansible.builtin.shell: "swapon --show --bytes --noheadings | grep '/swapfile' | awk '{print $3}'"
+  register: swap_active_size_out
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: 计算当前 Swap 大小 (MB)
+  ansible.builtin.set_fact:
+    # 优先使用激活的大小，其次使用文件大小，都没有则为0
+    current_swap_mb: >-
+      {{
+        (swap_active_size_out.stdout | int / 1024 / 1024) | int
+        if (swap_active_size_out.stdout | length > 0)
+        else (
+          (swapfile_stat.stat.size | int / 1024 / 1024) | int
+          if (swapfile_stat.stat.exists and swapfile_stat.stat.size is defined)
+          else 0
+        )
+      }}
+
+# 3. 计算目标 Swap 大小
+- name: 计算目标交换空间大小 (MB)
+  ansible.builtin.set_fact:
+    # 逻辑：取 (最小值, 内存百分比计算值, 最大值) 排序后的中间值
+    # 注意：defaults 中 min/max 单位为 GB，这里转为 MB
+    target_swap_mb: >-
+      {{
+        ([
+          (swap_size_min | int * 1024),
+          (sys_mem_mb | int * swap_size_percentage | int / 100) | int,
+          (swap_size_max | int * 1024)
+        ] | sort)[1] | int
+      }}
   when: enable_swap | bool
 
-- name: 获取系统内存大小(MB)
-  ansible.builtin.shell: "free -m | grep Mem | awk '{print $2}'"
-  register: system_memory_mb
-  changed_when: false
-  check_mode: false
-  when: 
-    - enable_swap | bool
-    - swap_exists.stdout | int == 0
+# 4. 输出调试信息 (关键步骤，解决用户疑惑)
+- name: 调试 - 显示 Swap 配置状态
+  ansible.builtin.debug:
+    msg:
+      - "----------------------------------------"
+      - "配置开关 (enable_swap): {{ enable_swap }}"
+      - "系统内存: {{ sys_mem_mb }} MB"
+      - "当前 Swap: {{ current_swap_mb }} MB (文件存在: {{ swapfile_stat.stat.exists }}, 已激活: {{ swap_active_size_out.stdout | length > 0 }})"
+      - "目标 Swap: {{ target_swap_mb | default('N/A') }} MB"
+      - "是否需要变更: {{ (enable_swap | bool and (current_swap_mb | int != target_swap_mb | int)) or (not enable_swap | bool and current_swap_mb | int > 0) }}"
+      - "----------------------------------------"
 
-- name: 计算交换空间大小(GB)
-  ansible.builtin.set_fact:
-    calculated_swap_gb: "{{ [swap_size_min, (system_memory_mb.stdout | int * swap_size_percentage / 100 / 1024) | round(0, 'common') | int, swap_size_max] | sort | [1] }}"
-  when: 
-    - enable_swap | bool
-    - swap_exists.stdout | int == 0
+# 5. 执行变更逻辑
+# 情况 A: 需要调整大小 (先删后建) 或 需要禁用 (只删)
+- name: 停止并清理旧 Swap
+  block:
+    - name: 执行 swapoff
+      ansible.builtin.command: swapoff /swapfile
+      when: swap_active_size_out.stdout | length > 0
+      
+    - name: 删除旧 swapfile
+      ansible.builtin.file:
+        path: /swapfile
+        state: absent
+  when:
+    - (enable_swap | bool and (current_swap_mb | int != target_swap_mb | int)) or (not enable_swap | bool and swapfile_stat.stat.exists)
 
-- name: 创建交换文件
-  ansible.builtin.shell: "fallocate -l {{ calculated_swap_gb }}G /swapfile || dd if=/dev/zero of=/swapfile bs=1G count={{ calculated_swap_gb }}"
-  when: 
-    - enable_swap | bool
-    - swap_exists.stdout | int == 0
+# 情况 B: 启用且需要创建 (文件不存在，或刚被删除)
+- name: 创建并启用新 Swap
+  block:
+    - name: 创建 Swap 文件 (尝试 fallocate)
+      ansible.builtin.command: "fallocate -l {{ target_swap_mb }}M /swapfile"
+      register: fallocate_result
+      ignore_errors: true
 
-- name: 设置交换文件权限
-  ansible.builtin.file:
-    path: /swapfile
-    mode: '0600'
-  when: 
-    - enable_swap | bool
-    - swap_exists.stdout | int == 0
+    - name: 创建 Swap 文件 (dd 兜底)
+      ansible.builtin.command: "dd if=/dev/zero of=/swapfile bs=1M count={{ target_swap_mb }}"
+      when: fallocate_result.failed
 
-- name: 格式化交换文件
-  ansible.builtin.command: mkswap /swapfile
-  when: 
-    - enable_swap | bool
-    - swap_exists.stdout | int == 0
+    - name: 设置文件权限 (0600)
+      ansible.builtin.file:
+        path: /swapfile
+        mode: '0600'
+        owner: root
+        group: root
 
-- name: 启用交换空间
-  ansible.builtin.command: swapon /swapfile
-  when: 
-    - enable_swap | bool
-    - swap_exists.stdout | int == 0
+    - name: 格式化为 Swap
+      ansible.builtin.command: mkswap /swapfile
 
-- name: 添加交换空间到 fstab
+    - name: 激活 Swap
+      ansible.builtin.command: swapon /swapfile
+  when:
+    - enable_swap | bool
+    - (current_swap_mb | int != target_swap_mb | int)
+
+# 6. 持久化配置
+- name: 更新 /etc/fstab
   ansible.posix.mount:
     name: none
     src: /swapfile
@@ -55,12 +116,10 @@
     opts: sw
     passno: 0
     dump: 0
-    state: present
-  when: 
-    - enable_swap | bool
-    - swap_exists.stdout | int == 0
+    state: "{{ 'present' if (enable_swap | bool) else 'absent' }}"
 
-- name: 应用基本 sysctl 参数
+# 7. Sysctl 优化
+- name: 应用 Sysctl 优化参数
   ansible.posix.sysctl:
     name: "{{ item.key }}"
     value: "{{ item.value }}"
@@ -70,7 +129,8 @@
   loop: "{{ sysctl_tune | dict2items | rejectattr('key', 'equalto', 'net.core.default_qdisc') | rejectattr('key', 'equalto', 'net.ipv4.tcp_congestion_control') | list }}"
   when: enable_system_tune | bool
 
-- name: 检查内核版本是否支持 BBR
+# 8. BBR 优化
+- name: 检查内核版本 (BBR要求 >= 4.9)
   ansible.builtin.shell: "uname -r | awk -F'[-.]' '{print $1 * 10000 + $2 * 100 + $3}'"
   register: kernel_version
   changed_when: false
@@ -79,7 +139,7 @@
     - enable_system_tune | bool
     - enable_bbr | bool
 
-- name: 启用 BBR 拥塞控制算法
+- name: 启用 BBR
   ansible.posix.sysctl:
     name: "{{ item.name }}"
     value: "{{ item.value }}"
@@ -95,4 +155,4 @@
     - enable_system_tune | bool
     - enable_bbr | bool
     - kernel_version.stdout is defined
-    - kernel_version.stdout | int >= 40900  # 内核版本 4.9.0 或更高
+    - kernel_version.stdout | int >= 40900

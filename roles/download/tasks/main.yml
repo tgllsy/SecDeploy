@@ -1,0 +1,16 @@
+# 下载并解压文件到 /opt/ 目录的主任务
+---
+
+- name: 遍历下载链接列表
+  ansible.builtin.include_tasks:
+    file: download_and_extract.yml
+    apply:
+      vars:
+        download_url: "{{ item }}"
+  loop: "{{ download_links }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - download_links is defined
+    - download_links | length > 0
+    - not ansible_check_mode

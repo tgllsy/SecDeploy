@@ -1,0 +1,85 @@
+# 下载并解压文件到 /opt/ 目录的任务
+---
+
+- name: 从下载链接获取文件名
+  ansible.builtin.set_fact:
+    archive_filename: "{{ download_url | basename }}"
+    temp_dir: "/tmp/download_{{ ansible_date_time.epoch }}"
+
+- name: 创建临时目录
+  ansible.builtin.file:
+    path: "{{ temp_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: 下载文件到临时目录
+  ansible.builtin.get_url:
+    url: "{{ download_url }}"
+    dest: "{{ temp_dir }}/{{ archive_filename }}"
+    mode: "0644"
+  register: download_result
+  retries: 3
+  delay: 5
+  until: download_result is succeeded
+
+- name: 检查文件类型并解压到 /opt/ 目录
+  block:
+    # 处理 zip 文件
+    - name: 解压 zip 文件到 /opt/ 目录
+      ansible.builtin.unarchive:
+        src: "{{ temp_dir }}/{{ archive_filename }}"
+        dest: "/opt/"
+        remote_src: true
+        mode: "0755"
+      when: archive_filename | regex_search('\.zip$')
+
+    # 处理 tar.gz 或 tgz 文件
+    - name: 解压 tar.gz/tgz 文件到 /opt/ 目录
+      ansible.builtin.unarchive:
+        src: "{{ temp_dir }}/{{ archive_filename }}"
+        dest: "/opt/"
+        remote_src: true
+        mode: "0755"
+      when: archive_filename | regex_search('\.(tar\.gz|tgz)$')
+
+    # 处理 tar.bz2 或 tbz2 文件
+    - name: 解压 tar.bz2/tbz2 文件到 /opt/ 目录
+      ansible.builtin.unarchive:
+        src: "{{ temp_dir }}/{{ archive_filename }}"
+        dest: "/opt/"
+        remote_src: true
+        mode: "0755"
+      when: archive_filename | regex_search('\.(tar\.bz2|tbz2)$')
+
+    # 处理 tar.xz 文件
+    - name: 解压 tar.xz 文件到 /opt/ 目录
+      ansible.builtin.unarchive:
+        src: "{{ temp_dir }}/{{ archive_filename }}"
+        dest: "/opt/"
+        remote_src: true
+        mode: "0755"
+      when: archive_filename | regex_search('\.tar\.xz$')
+
+    # 处理 tar 文件
+    - name: 解压 tar 文件到 /opt/ 目录
+      ansible.builtin.unarchive:
+        src: "{{ temp_dir }}/{{ archive_filename }}"
+        dest: "/opt/"
+        remote_src: true
+        mode: "0755"
+      when: archive_filename | regex_search('\.tar$')
+
+    # 处理 7z 文件
+    - name: 解压 7z 文件到 /opt/ 目录
+      ansible.builtin.shell:
+        cmd: "7z x {{ temp_dir }}/{{ archive_filename }} -o/opt/ -y"
+        executable: /bin/bash
+      when: archive_filename | regex_search('\.7z$')
+
+  always:
+    # 清理临时文件和目录
+    - name: 删除临时目录
+      ansible.builtin.file:
+        path: "{{ temp_dir }}"
+        state: absent
+        force: true
